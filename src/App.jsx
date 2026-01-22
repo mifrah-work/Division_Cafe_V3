@@ -194,43 +194,10 @@ function App() {
     }
   }, [gameState])
 
-  // Generate a new division question based on current day
+  // Generate a new division question with random divisors from 0-11
   const generateQuestion = () => {
-    let minDivisor, maxDivisor
-    
-    // Set divisor range based on current day
-    switch(currentDay) {
-      case 1:
-        minDivisor = 1
-        maxDivisor = 3
-        break
-      case 2:
-        minDivisor = 3
-        maxDivisor = 5
-        break
-      case 3:
-        minDivisor = 1
-        maxDivisor = 5
-        break
-      case 4:
-        minDivisor = 6
-        maxDivisor = 8
-        break
-      case 5:
-        minDivisor = 6
-        maxDivisor = 10
-        break
-      case 6:
-      case 7:
-        minDivisor = 1
-        maxDivisor = 10
-        break
-      default:
-        minDivisor = 1
-        maxDivisor = 10
-    }
-    
-    const num2 = Math.floor(Math.random() * (maxDivisor - minDivisor + 1)) + minDivisor
+    // All days use random division questions from 0-11
+    const num2 = Math.floor(Math.random() * 12) // 0-11
     const answer = Math.floor(Math.random() * 10) + 1
     const num1 = num2 * answer
     setQuestion({ num1, num2, answer })
