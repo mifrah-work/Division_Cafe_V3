@@ -196,8 +196,8 @@ function App() {
 
   // Generate a new division question with random divisors from 0-11
   const generateQuestion = () => {
-    // All days use random division questions from 0-11
-    const num2 = Math.floor(Math.random() * 12) // 0-11
+    // All days use random division questions from 1-11 (excluding 0 to avoid 0/0)
+    const num2 = Math.floor(Math.random() * 11) + 1 // 1-11
     const answer = Math.floor(Math.random() * 10) + 1
     const num1 = num2 * answer
     setQuestion({ num1, num2, answer })
