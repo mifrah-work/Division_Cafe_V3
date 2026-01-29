@@ -47,6 +47,15 @@ function App() {
       toppings: []
     }
   })
+  
+  // Timer state
+  const [timerSeconds, setTimerSeconds] = useState(0)
+  const [timerRunning, setTimerRunning] = useState(false)
+  const [dayTimes, setDayTimes] = useState(() => {
+    const saved = localStorage.getItem('divisionCafeDayTimes')
+    return saved ? JSON.parse(saved) : {}
+  })
+  const [showBeatRecordNotification, setShowBeatRecordNotification] = useState(false)
 
   // Save to localStorage whenever completedDays changes
   useEffect(() => {
@@ -68,6 +77,7 @@ function App() {
       localStorage.removeItem('divisionCafeCompletedDays')
       localStorage.removeItem('divisionCafeUnlockedDrinks')
       localStorage.removeItem('divisionCafeCustomDrink')
+      localStorage.removeItem('divisionCafeDayTimes')
       setCompletedDays([])
       setUnlockedDrinks(['Coffee', 'Matcha Latte', 'Chocolate Milkshake'])
       setCustomDrink({
@@ -75,6 +85,7 @@ function App() {
         colors: ['#FFB6C1'],
         toppings: []
       })
+      setDayTimes({})
       setGameState('home')
     }
   }
@@ -187,12 +198,52 @@ function App() {
     winAudio.play().catch(err => console.log('Win sound failed:', err))
   }
 
+  const playRandomThanksSound = () => {
+    const thanksFiles = ['thanks1.MP3', 'thanks2.MP3', 'thanks3.MP3', 'thanks4.MP3', 'thanks5.MP3']
+    const randomFile = thanksFiles[Math.floor(Math.random() * thanksFiles.length)]
+    const thanksAudio = new Audio(`${baseUrl}assets/thanks/${randomFile}`)
+    thanksAudio.volume = 1.0
+    thanksAudio.play().catch(err => console.log('Thanks sound failed:', err))
+  }
+
   // Play win sound when unlock popup appears
   useEffect(() => {
     if (gameState === 'unlockPopup') {
       playWinSound()
     }
   }, [gameState])
+
+  // Timer logic
+  useEffect(() => {
+    let interval
+    if (timerRunning) {
+      interval = setInterval(() => {
+        setTimerSeconds(prev => prev + 1)
+      }, 1000)
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [timerRunning])
+
+  // Start timer when entering playing state, pause when showing next order screen
+  useEffect(() => {
+    if (gameState === 'playing' && currentQuestion < 10) {
+      setTimerRunning(true)
+    } else if (gameState === 'playing' && currentQuestion === 10) {
+      // Pause timer when showing "Incoming Next Order" screen
+      setTimerRunning(false)
+    } else {
+      setTimerRunning(false)
+    }
+  }, [gameState, currentQuestion])
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
 
   // Generate a new division question with random divisors from 0-11
   const generateQuestion = () => {
@@ -217,6 +268,7 @@ function App() {
   const startDay = (day) => {
     setCurrentDay(day)
     setSelectedDrinks([])
+    setShowBeatRecordNotification(false)
     setGameState('selectDrinks')
   }
 
@@ -226,6 +278,8 @@ function App() {
     setAnswer('')
     setFeedback('')
     setLastWrongAnswer(null)
+    setTimerSeconds(0)
+    setTimerRunning(true)
     setGameState('playing')
   }
 
@@ -298,13 +352,33 @@ function App() {
   const serveDrink = () => {
     if (currentQuestion === 10) {
       if (currentDrink < 3) {
+        playRandomThanksSound()
+        // Resume timer for next order
         setCurrentDrink(currentDrink + 1)
         setCurrentQuestion(1)
         setAnswer('')
         setFeedback('')
         setLastWrongAnswer(null)
+        setTimerRunning(true)
       } else {
-        // Day completed
+        // Day completed - save the time
+        const newDayTimes = { ...dayTimes, [currentDay]: timerSeconds }
+        setDayTimes(newDayTimes)
+        setTimerRunning(false)
+        
+        // Check if this time beats the previous fastest (only if not day 1)
+        const previousCompletedTimes = completedDays
+          .filter(day => day !== currentDay)
+          .map(day => dayTimes[day] || Infinity)
+        const previousFastest = previousCompletedTimes.length > 0 ? Math.min(...previousCompletedTimes) : Infinity
+        
+        if (currentDay > 1 && timerSeconds < previousFastest) {
+          setShowBeatRecordNotification(true)
+          playWinSound()
+        } else {
+          playRandomThanksSound()
+        }
+        
         // Check if day 7 is completed - always show week complete
         if (currentDay === 7) {
           setGameState('weekComplete')
@@ -327,7 +401,7 @@ function App() {
             return
           }
         }
-        setGameState('dayComplete')
+        setGameState('home')
       }
     }
   }
@@ -338,7 +412,7 @@ function App() {
   }
 
   const continueAfterUnlock = () => {
-    setGameState('dayComplete')
+    setGameState('home')
   }
 
   const saveCustomDrink = () => {
@@ -837,6 +911,22 @@ function App() {
         </div>
         <div className="days-container">
           <h2>Choose Your Day</h2>
+          {showBeatRecordNotification && (
+            <div className="beat-record-notification">
+              🎉🎉 Beat fastest time of the week! 🎉🎉
+            </div>
+          )}
+          {completedDays.length > 0 && (
+            <div className="fastest-time-display">
+              {(() => {
+                const completedTimes = completedDays
+                  .map(day => ({ day, time: dayTimes[day] || 0 }))
+                  .sort((a, b) => a.time - b.time)
+                const fastest = completedTimes[0]
+                return <>Fastest time of the week so far: <strong>Day {fastest.day} ({formatTime(fastest.time)})</strong></>
+              })()}
+            </div>
+          )}
           <div className="days-grid">
             {[1, 2, 3, 4, 5, 6, 7].map(day => {
               const isLocked = day > 1 && !completedDays.includes(day - 1)
@@ -852,7 +942,7 @@ function App() {
                     {isLocked ? '🔒' : isCompleted ? '✓' : ''} Day {day}
                   </div>
                   <div className="day-subtitle">
-                    {isLocked ? 'Complete Day ' + (day - 1) : '3 Drinks to Serve'}
+                    {isLocked ? 'Complete Day ' + (day - 1) : isCompleted ? 'Time to serve: ' + formatTime(dayTimes[day] || 0) : '3 Drinks to Serve'}
                   </div>
                 </button>
               )
@@ -863,19 +953,7 @@ function App() {
     )
   }
 
-  if (gameState === 'dayComplete') {
-    return (
-      <div className="app home-screen">
-        <div className="complete-screen">
-          <h1>🎉 Day {currentDay} Complete! 🎉</h1>
-          <p>You've successfully served all 3 drinks!</p>
-          <button className="home-button" onClick={goHome}>
-            Return to Café
-          </button>
-        </div>
-      </div>
-    )
-  }
+
 
   if (gameState === 'weekComplete') {
     return (
@@ -903,6 +981,7 @@ function App() {
     <div className="app game-screen">
       <div className="game-header">
         <button className="back-button" onClick={goHome}>← Back to Café</button>
+        <div className="timer-display-center">⏱️ {formatTime(timerSeconds)}</div>
         <div className="progress-info">
           <span>Day {currentDay}</span>
           <span className="separator">•</span>
