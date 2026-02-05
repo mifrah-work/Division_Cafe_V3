@@ -961,7 +961,7 @@ function App() {
         <div className="week-complete-overlay">
           <div className="week-complete-sign">
             <div className="sign-border">
-              <h1 className="week-complete-title">Well Done Working 3</h1>
+              <h1 className="week-complete-title">Well Done Working Wk 4</h1>
               <h1 className="week-complete-title">At The Division Café!</h1>
               <p className="week-complete-subtitle">See you soon ☕</p>
               <div className="screenshot-reminder">
